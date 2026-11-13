@@ -1,0 +1,39 @@
+{% extends "shop/base.html" %}
+{% block title %}Order #{{ order.id }} - Uplix Live{% endblock %}
+{% block body %}
+<section class="confirm">
+  <div class="tick">&#10003;</div>
+  <h1>Order placed</h1>
+  <p class="muted">Demo order #{{ order.id }} &mdash; nothing is delivered or charged.</p>
+</section>
+
+<div class="summary">
+  <div class="row"><span>Status</span><span>Placed (demo)</span></div>
+  <div class="row"><span>Placed</span><span>{{ order.created_at.strftime("%d %b %Y, %H:%M") }}</span></div>
+  <div class="row"><span>Round</span><span>{{ order.round }}</span></div>
+  <div class="row"><span>Payment</span><span>Cash on delivery</span></div>
+  <div class="row"><span>Delivery</span><span>classroom</span></div>
+</div>
+
+<div class="lines">
+  {% for item in order['items'] %}
+  <div class="line">
+    <div class="line-main">
+      <span class="line-name">{{ names.get(item.product_id, "Item") }}</span>
+      <span class="muted">{{ item.qty }} &times; &#8377;{{ money(item.unit_price) }}</span>
+    </div>
+    <div class="line-total">&#8377;{{ money(item.qty * item.unit_price) }}</div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="summary">
+  <div class="row"><span>Subtotal</span><span>&#8377;{{ money(order.subtotal) }}</span></div>
+  {% if order.discount %}
+  <div class="row"><span>Coupon</span><span>&minus;&#8377;{{ money(order.discount) }}</span></div>
+  {% endif %}
+  <div class="row total"><span>Total</span><span>&#8377;{{ money(order.total) }}</span></div>
+</div>
+
+<p class="muted"><a href="/orders">See my orders</a> &middot; <a href="/">Keep shopping</a></p>
+{% endblock %}

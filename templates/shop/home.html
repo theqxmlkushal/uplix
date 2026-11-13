@@ -1,0 +1,32 @@
+{% extends "shop/base.html" %}
+{% block title %}Shop - Uplix Live{% endblock %}
+{% block body %}
+<section class="hero">
+  <h1>Class demo shop</h1>
+  <p class="muted">Fake money only: pick what you like, nothing is delivered or charged.</p>
+</section>
+
+<div class="chips">
+  <a class="chip{% if not active_category and not q %} on{% endif %}" href="/">All</a>
+  {% for c in categories %}
+  <a class="chip{% if active_category == c %} on{% endif %}" href="/?category={{ c | urlencode }}">{{ c }}</a>
+  {% endfor %}
+</div>
+
+{% if q %}<p class="muted results">Results for &ldquo;{{ q }}&rdquo; &mdash; {{ products | length }} item(s)</p>{% endif %}
+
+{% if not products %}
+<p class="empty">Nothing matches. Try another word.</p>
+{% endif %}
+
+<div class="grid">
+  {% for p in products %}
+  <a class="card" href="/product/{{ p.id }}">
+    <div class="thumb">{{ emoji_for(p.category) }}</div>
+    <div class="name">{{ p.name }}</div>
+    <div class="price">&#8377;{{ money(p.price) }}</div>
+    <span class="pill">{{ p.category }}</span>
+  </a>
+  {% endfor %}
+</div>
+{% endblock %}

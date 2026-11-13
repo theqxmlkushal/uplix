@@ -1,0 +1,25 @@
+{% extends "shop/base.html" %}
+{% block title %}{{ product.name }} - Uplix Live{% endblock %}
+{% block body %}
+<article class="product">
+  <a class="back" href="/">&larr; Back to the shop</a>
+  <div class="product-inner">
+    <div class="big-thumb">{{ emoji_for(product.category) }}</div>
+    <div class="product-info">
+      <span class="pill">{{ product.category }}</span>
+      <h1>{{ product.name }}</h1>
+      <p class="price big">&#8377;{{ money(product.price) }}</p>
+
+      <form method="post" action="/cart/add" class="qty-form">
+        <input type="hidden" name="product_id" value="{{ product.id }}">
+        <label for="qty">Quantity</label>
+        <input id="qty" name="qty" type="number" min="1" max="99" value="1">
+        <button type="submit" class="primary">Add to cart</button>
+      </form>
+
+      {% if in_cart %}<p class="muted">{{ in_cart }} in your cart &mdash; <a href="/cart">see cart</a></p>{% endif %}
+      <p class="muted small">Cash on delivery only. This is a demo: nothing is delivered or charged.</p>
+    </div>
+  </div>
+</article>
+{% endblock %}

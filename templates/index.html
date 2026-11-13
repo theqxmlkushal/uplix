@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block body %}
+<h1>Catalogue</h1>
+<div class="grid">
+  {% for p in products %}
+  <div class="card">
+    <div>{{ p.name }}</div>
+    <div class="price">₹{{ p.price }}</div>
+    <small>{{ p.category }}</small>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

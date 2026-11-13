@@ -1,0 +1,44 @@
+{% extends "shop/base.html" %}
+{% block title %}Checkout - Uplix Live{% endblock %}
+{% block body %}
+<h1>Checkout</h1>
+
+<div class="lines">
+  {% for line in lines %}
+  <div class="line">
+    <div class="line-main">
+      <span class="line-name">{{ emoji_for(line.category) }} {{ line.name }}</span>
+      <span class="muted">{{ line.qty }} &times; &#8377;{{ money(line.price) }}</span>
+    </div>
+    <div class="line-total">&#8377;{{ money(line.line_total) }}</div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="summary">
+  <div class="row"><span>Subtotal</span><span class="subtotal" data-subtotal="{{ subtotal }}">&#8377;{{ money(subtotal) }}</span></div>
+  {% include "shop/_coupon.html" %}
+  <div class="row total"><span>Total</span><span class="total" data-total="{{ total }}">&#8377;{{ money(total) }}</span></div>
+</div>
+
+<div class="pay">
+  <h2>Payment</h2>
+  <label class="pay-option">
+    <input type="radio" name="payment" value="COD" checked disabled>
+    <span>Cash on delivery</span>
+  </label>
+  <p class="muted">Delivery: classroom &mdash; no address needed.</p>
+</div>
+
+{% if can_order %}
+<form method="post" action="/checkout/place" class="place">
+  <input type="hidden" name="order_key" value="{{ order_key }}">
+  <button type="submit" class="primary block"
+          onclick="this.disabled=true;this.form.submit();return false;">Place order</button>
+</form>
+{% else %}
+<p class="closed-note">Ordering is closed right now &mdash; your cart is kept for later.</p>
+{% endif %}
+
+<p class="muted small"><a href="/cart">&larr; Back to cart</a></p>
+{% endblock %}

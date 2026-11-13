@@ -1,0 +1,29 @@
+{% extends "shop/base.html" %}
+{% block title %}Sign up - Uplix Live{% endblock %}
+{% block body %}
+<section class="auth">
+  <h1>Create your account</h1>
+  <p class="muted">Pick a nickname and a 4-digit PIN. No email, no phone, no address.</p>
+
+  {% if error %}<div class="flash error">{{ error }}</div>{% endif %}
+
+  <form method="post" action="/signup" class="form">
+    <label for="nickname">Nickname</label>
+    <input id="nickname" name="nickname" type="text" value="{{ nickname or '' }}"
+           maxlength="20" autocomplete="username" required>
+
+    <label for="pin">4-digit PIN</label>
+    <input id="pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]*"
+           maxlength="4" autocomplete="new-password" required>
+
+    <label class="check">
+      <input type="checkbox" name="consent" value="on" required>
+      <span>{{ consent_notice }}</span>
+    </label>
+
+    <button type="submit" class="primary">Sign up</button>
+  </form>
+
+  <p class="muted">Already have an account? <a href="/signin">Sign in</a></p>
+</section>
+{% endblock %}

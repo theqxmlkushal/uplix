@@ -1,0 +1,29 @@
+{% extends "shop/base.html" %}
+{% block title %}My orders - Uplix Live{% endblock %}
+{% block body %}
+<h1>My orders</h1>
+
+{% if not orders %}
+<p class="empty">No orders yet. <a href="/">Browse the shop</a>.</p>
+{% else %}
+<div class="orders">
+  {% for o in orders %}
+  <a class="order-card" href="/orders/{{ o.id }}">
+    <div class="order-head">
+      <strong>Order #{{ o.id }}</strong>
+      <span class="muted">{{ o.created_at.strftime("%d %b %Y, %H:%M") }}</span>
+    </div>
+    <div class="order-meta">
+      <span>{{ o['items'] | length }} item(s)</span>
+      <span>Round {{ o.round }}</span>
+      <span>Placed (demo)</span>
+    </div>
+    <div class="order-foot">
+      {% if show_discount and o.discount %}<span class="muted">was &#8377;{{ money(o.subtotal) }}</span>{% endif %}
+      <strong>&#8377;{{ money(o.total) }}</strong>
+    </div>
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

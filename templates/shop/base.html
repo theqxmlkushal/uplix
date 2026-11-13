@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Uplix Live{% endblock %}</title>
+  <link rel="stylesheet" href="/shop.css">
+</head>
+<body>
+  <div class="banner">Demo shop: nothing is delivered or charged</div>
+
+  <header class="topbar">
+    <a class="logo" href="/">Uplix&nbsp;Live</a>
+    <form class="search" action="/" method="get" role="search">
+      <input type="search" name="q" value="{{ request.args.get('q', '') }}"
+             placeholder="Search items or categories" aria-label="Search items or categories">
+      <button type="submit">Search</button>
+    </form>
+    <nav class="nav">
+      <a class="cart-link" href="/cart" aria-label="Cart">&#128722;<span class="cart-count">{{ cart_count }}</span></a>
+      <a href="/orders">My orders</a>
+      {% if me %}
+      <span class="who">{{ me.nickname }}</span>
+      <a href="/signout">Sign out</a>
+      {% else %}
+      <a href="/signin">Sign in</a>
+      {% endif %}
+    </nav>
+  </header>
+
+  <div class="state-notice">{{ state_notice }}</div>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+    <div class="flash {{ category }}">{{ message }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  <main>{% block body %}{% endblock %}</main>
+
+  <footer class="foot">
+    <p>Uplix Live &mdash; class demo shop. Fake money, cash on delivery only.</p>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,9 @@
+{% if coupon %}
+<div class="coupon-box{% if coupon.applied %} applied{% endif %}">
+  {% if coupon.applied %}
+  <p class="coupon-ok">Coupon applied: {{ coupon.discount }} off</p>
+  {% else %}
+  <p class="coupon-hint">Add items worth {{ coupon.short }} more to use your coupon</p>
+  {% endif %}
+</div>
+{% endif %}
