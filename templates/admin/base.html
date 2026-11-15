@@ -4,23 +4,27 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Admin{% endblock %} · Uplix Live</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/admin.css">
 </head>
 <body>
 <div class="shell">
   <aside class="sidebar">
-    <div class="brand">Uplix <b>Admin</b></div>
+    <div class="brand">&#128717;&#65039; Uplix <b>Admin</b></div>
     <nav class="nav">
-      {% set items = [('admin.overview','Overview'), ('admin.customers','Customers'),
-                      ('admin.orders','Orders'), ('admin.experiment','Experiment'),
-                      ('admin.results','Results'), ('admin.model','Model'), ('admin.data','Data')] %}
-      {% for endpoint, label in items %}
+      {% set items = [('admin.overview','📊','Overview'), ('admin.customers','👥','Customers'),
+                      ('admin.orders','🧾','Orders'), ('admin.experiment','🧪','Experiment'),
+                      ('admin.results','🏆','Results'), ('admin.model','🤖','Model'),
+                      ('admin.data','💾','Data')] %}
+      {% for endpoint, icon, label in items %}
         <a href="{{ url_for(endpoint, source=source) }}"
-           class="{% if request.endpoint == endpoint %}active{% endif %}">{{ label }}</a>
+           class="{% if request.endpoint == endpoint %}active{% endif %}">
+          <span class="nav-icon" aria-hidden="true">{{ icon }}</span>{{ label }}
+        </a>
       {% endfor %}
     </nav>
     <div class="sidebar-foot">
-      <a href="/" target="_blank" rel="noopener">Open shop &#8599;</a>
+      <a href="/" target="_blank" rel="noopener">&#128717;&#65039; Open shop &#8599;</a>
       <form method="post" action="{{ url_for('admin.logout') }}">
         <button type="submit" class="link">Sign out</button>
       </form>

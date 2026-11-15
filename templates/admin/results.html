@@ -1,7 +1,30 @@
 {% extends "admin/base.html" %}
+{% from "admin/_uplift.html" import uplift_number with context %}
 {% block title %}Results{% endblock %}
 {% block body %}
 <h1>Results <span class="muted mono">{{ source }}</span></h1>
+
+<section class="card uplift-card">
+  <div class="uplift-main">
+    {{ uplift_number(effect, state, source) }}
+  </div>
+  <div class="uplift-side">
+    <p class="eyebrow">Verdict</p>
+    {% if effect %}
+      <p class="verdict-big"><span class="badge {{ effect.verdict }}">{{ effect.verdict }}</span></p>
+      <p class="muted small">
+        {% if effect.verdict == 'reliable' %}
+          The coupon's measured uplift is statistically reliable at this sample size.
+        {% else %}
+          Not enough evidence yet. The reasons are listed under the effect table.
+        {% endif %}
+      </p>
+    {% else %}
+      <p class="muted small">Randomize or launch the treatment to compare the two groups.</p>
+    {% endif %}
+    <p class="side-link"><a class="button" href="{{ url_for('admin.experiment', source=source) }}">Open experiment</a></p>
+  </div>
+</section>
 
 {% if provisional %}
 <div class="flash notice">Provisional: the state is {{ state.state }}, so the numbers can still change. They become final at CLOSED.</div>

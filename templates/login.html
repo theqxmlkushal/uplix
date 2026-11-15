@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sign in · Uplix Live</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/shop.css">
+</head>
+<body>
+  <div class="banner">Demo shop: nothing is delivered or charged</div>
+
+  <header class="topbar">
+    <a class="logo" href="/">Uplix&nbsp;Live</a>
+    <nav class="nav">
+      <a href="/">Browse the shop</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="auth">
+      <h1>Choose how to sign in</h1>
+      <p class="muted">One app, two sides. Pick the side you need; you can switch later.</p>
+
+      <div class="roles">
+        <a class="role-card" href="/signin">
+          <span class="role-icon" aria-hidden="true">&#128717;&#65039;</span>
+          <b>I'm a customer</b>
+          <span class="muted small">Sign in with your nickname and 4-digit PIN.</span>
+        </a>
+        <a class="role-card" href="{{ url_for('admin.login') }}">
+          <span class="role-icon" aria-hidden="true">&#128274;</span>
+          <b>I'm an admin</b>
+          <span class="muted small">Sign in with the admin account ID and password.</span>
+        </a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <p>Uplix Live &mdash; class demo shop. Fake money, cash on delivery only.</p>
+  </footer>
+</body>
+</html>

@@ -27,6 +27,7 @@ from db import execute, query                    # noqa: E402
 URL = os.environ.get("TEST_DATABASE_URL")
 pytestmark = pytest.mark.skipif(not URL, reason="set TEST_DATABASE_URL to a throwaway database")
 
+ADMIN_ID = "admin-test"
 ADMIN_PASSWORD = "admin-test-password"
 SAMPLE = os.path.join(ROOT, "sample_data", "model_run_synthetic.json")
 
@@ -55,6 +56,7 @@ def schema():
 def clean(schema):
     """Every test starts from an empty real/synthetic dataset and SETUP."""
     os.environ["DATABASE_URL"] = URL
+    os.environ["ADMIN_ID"] = ADMIN_ID
     os.environ["ADMIN_PASSWORD"] = ADMIN_PASSWORD
     os.environ["ADMIN_BLOCK_SECONDS"] = "1"
     os.environ.pop("ML_API_URL", None)
@@ -87,7 +89,8 @@ def client(flask_app):
 
 @pytest.fixture()
 def admin_client(client):
-    response = client.post("/admin/login", data={"password": ADMIN_PASSWORD})
+    response = client.post("/admin/login",
+                           data={"admin_id": ADMIN_ID, "password": ADMIN_PASSWORD})
     assert response.status_code == 302
     return client
 
@@ -183,10 +186,11 @@ def test_shop_pages_never_link_to_admin(client):
         assert "/admin" not in html(response).lower(), path
 
 
-def test_login_compares_password_in_constant_time(admin_module):
-    assert admin_module.password_ok(ADMIN_PASSWORD) is True
-    assert admin_module.password_ok(ADMIN_PASSWORD + "x") is False
-    assert admin_module.password_ok("") is False
+def test_login_compares_id_and_password_in_constant_time(admin_module):
+    assert admin_module.credentials_ok(ADMIN_ID, ADMIN_PASSWORD) is True
+    assert admin_module.credentials_ok("wrong", ADMIN_PASSWORD) is False
+    assert admin_module.credentials_ok(ADMIN_ID, "wrong") is False
+    assert admin_module.credentials_ok("", "") is False
 
     seen = []
     real = admin_module.hmac.compare_digest
@@ -197,50 +201,90 @@ def test_login_compares_password_in_constant_time(admin_module):
 
     admin_module.hmac.compare_digest = spy
     try:
-        assert admin_module.password_ok(ADMIN_PASSWORD) is True
+        assert admin_module.credentials_ok(ADMIN_ID, ADMIN_PASSWORD) is True
     finally:
         admin_module.hmac.compare_digest = real
-    assert seen, "login must use hmac.compare_digest"
+    assert len(seen) == 2, "both halves must be compared"
     assert all(isinstance(a, bytes) and isinstance(b, bytes) for a, b in seen)
 
 
-def test_login_needs_a_configured_password(client):
+def test_login_needs_both_the_admin_id_and_password(client):
+    wrong_id = client.post("/admin/login",
+                           data={"admin_id": "root", "password": ADMIN_PASSWORD})
+    wrong_password = client.post("/admin/login",
+                                 data={"admin_id": ADMIN_ID, "password": "nope"})
+    assert wrong_id.status_code == wrong_password.status_code == 401
+    assert "Wrong account ID or password" in html(wrong_id)
+    assert "Wrong account ID or password" in html(wrong_password)
+
+    with client.session_transaction() as sess:
+        sess.pop("admin_fails", None)
+    correct = client.post("/admin/login",
+                          data={"admin_id": ADMIN_ID, "password": ADMIN_PASSWORD})
+    assert correct.status_code == 302
+
+
+def test_login_needs_a_configured_id_and_password(client):
     os.environ["ADMIN_PASSWORD"] = ""
-    response = client.post("/admin/login", data={"password": ""})
+    response = client.post("/admin/login", data={"admin_id": ADMIN_ID, "password": ""})
+    assert response.status_code == 401
+
+    os.environ["ADMIN_PASSWORD"] = ADMIN_PASSWORD
+    os.environ["ADMIN_ID"] = ""
+    response = client.post("/admin/login", data={"admin_id": "", "password": ADMIN_PASSWORD})
     assert response.status_code == 401
 
 
 def test_login_throttles_after_five_wrong_tries(client):
     for _ in range(4):
-        assert client.post("/admin/login", data={"password": "wrong"}).status_code == 401
-    assert client.post("/admin/login", data={"password": "wrong"}).status_code == 429
+        assert client.post("/admin/login",
+                           data={"admin_id": ADMIN_ID, "password": "wrong"}).status_code == 401
+    assert client.post("/admin/login",
+                       data={"admin_id": ADMIN_ID, "password": "wrong"}).status_code == 429
 
-    blocked = client.post("/admin/login", data={"password": ADMIN_PASSWORD})
+    blocked = client.post("/admin/login",
+                          data={"admin_id": ADMIN_ID, "password": ADMIN_PASSWORD})
     assert blocked.status_code == 429
     assert "Wait" in html(blocked)
     assert client.get("/admin/").status_code == 302
 
     with client.session_transaction() as sess:
         sess["admin_blocked_until"] = 0
-    assert client.post("/admin/login", data={"password": ADMIN_PASSWORD}).status_code == 302
+    assert client.post("/admin/login",
+                       data={"admin_id": ADMIN_ID, "password": ADMIN_PASSWORD}).status_code == 302
 
 
 def test_login_redirects_only_within_admin(client):
     response = client.post("/admin/login",
-                           data={"password": ADMIN_PASSWORD, "next": "/admin/data"})
+                           data={"admin_id": ADMIN_ID, "password": ADMIN_PASSWORD,
+                                 "next": "/admin/data"})
     assert response.headers["Location"].endswith("/admin/data")
 
     with client.session_transaction() as sess:
         sess.pop("is_admin", None)
     response = client.post("/admin/login",
-                           data={"password": ADMIN_PASSWORD, "next": "https://evil.example"})
+                           data={"admin_id": ADMIN_ID, "password": ADMIN_PASSWORD,
+                                 "next": "https://evil.example"})
     assert response.headers["Location"].endswith("/admin/")
+
+
+def test_neutral_login_page_offers_both_roles(client):
+    response = client.get("/login")
+    assert response.status_code == 200
+    body = html(response)
+    assert 'href="/signin"' in body
+    assert "/admin/login" in body
+    assert "customer" in body.lower() and "admin" in body.lower()
+
+    signin = html(client.get("/signin"))
+    assert 'href="/login"' in signin
+    assert "/admin" not in signin.lower()
 
 
 def test_logout_leaves_the_shop_session_alone(client):
     (pid,) = add_people(1)
     signin_shop(client, pid)
-    client.post("/admin/login", data={"password": ADMIN_PASSWORD})
+    client.post("/admin/login", data={"admin_id": ADMIN_ID, "password": ADMIN_PASSWORD})
     assert client.get("/admin/").status_code == 200
 
     client.post("/admin/logout")
@@ -346,6 +390,89 @@ def test_excluding_customers_is_closed_after_randomizing(admin_client):
     assert query("select excluded from participants where id = %s", (other,), one=True)["excluded"] is False
 
 
+def test_one_click_launch_randomizes_and_opens_round2(admin_client):
+    ids = add_people(5)
+    excluded = add_people(1, prefix="test", excluded=True)
+    add_people(2, source="synthetic", prefix="syn")
+    set_state("BETWEEN")
+
+    response = admin_client.post("/admin/experiment/launch", follow_redirects=True)
+    body = html(response)
+    assert "Treatment launched on 5 real customers" in body
+    assert "3 coupon, 2 control" in body
+    assert "State is now ROUND2" in body
+
+    stored = state()
+    assert stored["state"] == "ROUND2"
+    assert stored["randomized"] is True
+    assert stored["seed"] is not None
+
+    rows = query("select participant_id, t, e, seed from assignments order by participant_id")
+    assert len(rows) == 5
+    assert {row["participant_id"] for row in rows} == set(ids)
+    assert not ({row["participant_id"] for row in rows} & set(excluded))
+    assert sum(row["t"] for row in rows) == 3
+    assert all(row["seed"] == stored["seed"] for row in rows)
+
+    before = [(row["participant_id"], row["t"]) for row in rows]
+    again = admin_client.post("/admin/experiment/launch", follow_redirects=True)
+    assert "already live" in html(again)
+    assert state()["state"] == "ROUND2"
+    assert [(row["participant_id"], row["t"]) for row in
+            query("select participant_id, t from assignments order by participant_id")] == before
+
+
+def test_launch_refuses_before_between_and_with_too_few_customers(admin_client):
+    add_people(3)
+    response = admin_client.post("/admin/experiment/launch", follow_redirects=True)
+    assert "can only be launched in BETWEEN" in html(response)
+    assert state()["state"] == "SETUP"
+    assert query("select count(*) as n from assignments", one=True)["n"] == 0
+
+    set_state("BETWEEN")
+    execute("delete from participants where source = 'real'")
+    (one,) = add_people(1, prefix="solo")
+    response = admin_client.post("/admin/experiment/launch", follow_redirects=True)
+    assert "at least 2 real customers" in html(response)
+    stored = state()
+    assert stored["state"] == "BETWEEN"
+    assert stored["randomized"] is False
+    assert query("select count(*) as n from assignments", one=True)["n"] == 0
+
+
+def test_overview_and_experiment_show_the_one_click_launch(admin_client):
+    add_people(3)
+    set_state("BETWEEN")
+
+    for path in ("/admin/", "/admin/experiment"):
+        body = html(admin_client.get(path))
+        assert "Launch treatment" in body, path
+        assert 'action="/admin/experiment/launch"' in body, path
+
+    set_state("BETWEEN", randomized=True, seed=7)
+    assert "Launch treatment" not in html(admin_client.get("/admin/"))
+
+
+def test_launch_cannot_start_from_a_row_that_moved_underneath_it(admin_client, monkeypatch):
+    """The SQL lock is conditional on BETWEEN and randomized = false, not just the cached row."""
+    ids = add_people(4)
+    set_state("BETWEEN")
+    admin_module = sys.modules["admin"]
+
+    real_state_row = admin_module.state_row
+    monkeypatch.setattr(admin_module, "state_row", lambda: {"state": "BETWEEN", "randomized": False,
+                                                            "seed": None, "coupon_amount": 100,
+                                                            "coupon_min_subtotal": 300})
+    set_state("ROUND1")
+    response = admin_client.post("/admin/experiment/launch", follow_redirects=True)
+    assert "state changed" in html(response).lower()
+    stored = state()
+    assert stored["state"] == "ROUND1"
+    assert stored["randomized"] is False
+    assert query("select count(*) as n from assignments", one=True)["n"] == 0
+    monkeypatch.setattr(admin_module, "state_row", real_state_row)
+
+
 def test_coupon_text_only_for_treated_customers_in_round_two(client):
     treated, control = add_people(2)
     assign(treated, 1)
@@ -403,6 +530,33 @@ def test_results_match_the_golden_check(admin_client):
     set_state("CLOSED", randomized=True)
     body = html(admin_client.get("/admin/results?source=real"))
     assert "Provisional" not in body
+
+
+def test_overview_shows_the_uplift_in_big_bold_type(admin_client):
+    _golden_split()
+    set_state("ROUND2", randomized=True)
+
+    body = html(admin_client.get("/admin/?source=real"))
+    assert 'class="uplift-hero' in body
+    assert "+40.0" in body
+    assert "pp" in body
+    assert "5 vs 5 customers" in body
+    assert "provisional" in body.lower()
+    assert "Launch treatment" not in body
+
+    set_state("CLOSED", randomized=True)
+    final = html(admin_client.get("/admin/?source=real"))
+    assert "provisional" not in final.lower()
+
+
+def test_results_shows_the_uplift_in_big_bold_type(admin_client):
+    _golden_split()
+    set_state("ROUND2", randomized=True)
+
+    body = html(admin_client.get("/admin/results?source=real"))
+    assert 'class="uplift-hero' in body
+    assert "+40.0" in body
+    assert "5 vs 5 customers" in body
 
 
 def test_results_warn_when_everyone_orders_or_nobody_does(admin_client):
@@ -608,3 +762,28 @@ def test_reset_after_close_deletes_real_rows_only(admin_client):
     assert stored["state"] == "SETUP"
     assert stored["randomized"] is False
     assert stored["seed"] is None
+
+
+# --------------------------------------------------------------------------- Vercel readiness
+
+def test_vercel_config_and_cookie_settings(flask_app):
+    with open(os.path.join(ROOT, "vercel.json"), encoding="utf-8") as handle:
+        config = json.load(handle)
+    assert config["functions"]["app.py"]["maxDuration"] == 60
+
+    with open(os.path.join(ROOT, ".vercelignore"), encoding="utf-8") as handle:
+        ignored = [line.strip() for line in handle if line.strip()]
+    assert ".env" in ignored
+    assert ".env.*" in ignored
+    assert "sample_data" not in ignored
+
+    assert flask_app.config["SESSION_COOKIE_HTTPONLY"] is True
+    assert flask_app.config["SESSION_COOKIE_SAMESITE"] == "Lax"
+    assert flask_app.config["SESSION_COOKIE_NAME"] == "uplix_session"
+
+
+def test_admin_css_uses_the_shop_palette():
+    with open(os.path.join(ROOT, "public", "admin.css"), encoding="utf-8") as handle:
+        css = handle.read().lower()
+    for colour in ("#14161c", "#22b8cf", "#f4f6f8", "#e3e7ec"):
+        assert colour in css

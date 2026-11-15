@@ -8,6 +8,8 @@ charged"*.
 No admin route or admin link exists anywhere in the customer code — that is Member B's
 side (`admin.py`, `stats.py`, `tags.py`, `templates/admin/`, `public/admin.*`, see `ADMIN.md`).
 The merged app registers both blueprints and a customer session still cannot open `/admin`.
+The shop header's **Sign in** link goes to `/login`, a neutral role chooser outside both
+blueprints; that page offers customer and admin, so no shop page needs an `/admin` literal.
 
 ## Stack
 
@@ -78,7 +80,7 @@ cannot be wiped by accident. Tests never touch Supabase.
 | A11 (T) | Search by name and by category | ✅ `test_a11_search_finds_items_by_name_and_by_category` |
 | A12 (T) | Coupon maths 450→350, 250→250 + hint; control sees neither word | ✅ `test_a12_coupon_maths_and_the_control_group_sees_no_offer_text` |
 | A13 (T) | `coupon_seen` logged exactly once | ✅ `test_a13_coupon_seen_is_logged_exactly_once` |
-| A14 (T) | No `/admin` route or link in customer code | ✅ `test_a14_there_is_no_admin_route_and_no_admin_link` |
+| A14 (T) | No `/admin` route or link in customer code | ✅ `test_a14_there_is_no_admin_link_on_customer_pages` |
 | A15 | Deployed shop works on a phone over mobile data | ⏳ hand check — needs the Vercel deploy |
 | A16 | Rows visible in Supabase table editor after an order | ⏳ hand check — needs the Supabase project |
 | A17 | RLS on for every table; no Supabase public key in code | ⏳ hand check — needs the Supabase dashboard |

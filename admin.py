@@ -2,13 +2,16 @@
 
 Rules kept in this file:
 
-  * /admin/login takes one password (ADMIN_PASSWORD), compared in constant time, with a
-    throttle after 5 wrong tries. A signed is_admin flag lives in the session.
+  * /admin/login takes an account id (ADMIN_ID) and a password (ADMIN_PASSWORD), both
+    compared in constant time, with a throttle after 5 wrong tries. A signed is_admin flag
+    lives in the session.
   * Everything under /admin and every /admin/api/ endpoint requires that flag; a shop
     session (participant_id only) never grants it.
   * The state only moves along SETUP -> ROUND1 -> BETWEEN -> ROUND2 -> CLOSED and illegal
     moves are refused on the server.
   * Randomize works only in BETWEEN and only once: app_state.randomized is the lock.
+  * Launch is the one-click path: it draws the same locked split and moves to ROUND2 in a
+    single transaction, so the treatment starts on real customers immediately.
   * Reset real data is allowed before randomization, or after the experiment is CLOSED;
     it never touches synthetic rows.
   * Nothing is written to disk. Sessions live in the cookie, data in Postgres.
@@ -46,23 +49,41 @@ LEGAL_MOVES = {("SETUP", "ROUND1"), ("ROUND1", "BETWEEN"), ("BETWEEN", "ROUND2")
 ACTION_TARGET = {"start-round1": "ROUND1", "close-round1": "BETWEEN",
                  "start-round2": "ROUND2", "close-round2": "CLOSED"}
 
-FAIL_LIMIT = 5                      # wrong passwords in a row before the throttle
+FAIL_LIMIT = 5                      # wrong credentials in a row before the throttle
 DEFAULT_BLOCK_SECONDS = 60          # ADMIN_BLOCK_SECONDS can lower it (tests do)
+DEFAULT_ADMIN_ID = "admin"          # ADMIN_ID can replace it in a deployment
 CUSTOMER_PAGE_LIMIT = 400           # keep the synthetic page light; search narrows it
 
 
 # --------------------------------------------------------------------------- auth helpers
 
+def expected_id():
+    return os.environ.get("ADMIN_ID", DEFAULT_ADMIN_ID)
+
+
 def expected_password():
     return os.environ.get("ADMIN_PASSWORD", "")
 
 
+def credentials_ok(candidate_id, candidate_password):
+    """Check the account id and the password together, in constant time.
+
+    Both comparisons always run, even when the first value is already wrong, so a guess
+    cannot learn which half failed from the time the answer takes. An unset ADMIN_ID or
+    ADMIN_PASSWORD denies every login.
+    """
+    expected_id_value = expected_id().encode("utf-8")
+    expected_password_value = expected_password().encode("utf-8")
+    id_ok = hmac.compare_digest((candidate_id or "").encode("utf-8"), expected_id_value)
+    password_ok = hmac.compare_digest((candidate_password or "").encode("utf-8"),
+                                      expected_password_value)
+    configured = bool(expected_id_value) and bool(expected_password_value)
+    return configured and bool(id_ok & password_ok)
+
+
 def password_ok(candidate):
-    """Constant-time comparison, so a wrong guess leaks nothing through timing."""
-    expected = expected_password()
-    if not expected:
-        return False
-    return hmac.compare_digest((candidate or "").encode("utf-8"), expected.encode("utf-8"))
+    """Backwards-compatible helper: check only the password for the configured admin id."""
+    return credentials_ok(expected_id(), candidate)
 
 
 def is_admin():
@@ -146,16 +167,19 @@ def login():
     if request.method == "GET":
         if is_admin():
             return redirect(url_for("admin.overview"))
-        return render_template("admin/login.html", next=request.args.get("next", ""))
+        return render_template("admin/login.html", next=request.args.get("next", ""),
+                               admin_id="")
 
+    admin_id = request.form.get("admin_id", "")
     now = time.time()
     blocked_until = float(session.get("admin_blocked_until") or 0)
     if now < blocked_until:
         wait = math.ceil(blocked_until - now)
         return render_template("admin/login.html", next=request.form.get("next", ""),
+                               admin_id=admin_id,
                                error=f"Too many wrong tries. Wait {wait} more seconds."), 429
 
-    if password_ok(request.form.get("password")):
+    if credentials_ok(admin_id, request.form.get("password")):
         session.pop("admin_fails", None)
         session.pop("admin_blocked_until", None)
         session["is_admin"] = True
@@ -170,11 +194,13 @@ def login():
         block = int(os.environ.get("ADMIN_BLOCK_SECONDS", DEFAULT_BLOCK_SECONDS))
         session["admin_blocked_until"] = now + block
         return render_template("admin/login.html", next=request.form.get("next", ""),
+                               admin_id=admin_id,
                                error=f"Too many wrong tries. Wait {block} seconds."), 429
     session["admin_fails"] = fails
     left = FAIL_LIMIT - fails
     return render_template("admin/login.html", next=request.form.get("next", ""),
-                           error=f"Wrong password. {left} tries left before a pause."), 401
+                           admin_id=admin_id,
+                           error=f"Wrong account ID or password. {left} tries left before a pause."), 401
 
 
 @admin.route("/logout", methods=["POST"])
@@ -367,6 +393,8 @@ def experiment():
 def move(action):
     if action == "randomize":
         return randomize()
+    if action == "launch":
+        return launch()
     target = ACTION_TARGET.get(action)
     st = state_row()
     if target is None or (st["state"], target) not in LEGAL_MOVES:
@@ -380,21 +408,26 @@ def move(action):
     return redirect(url_for("admin.experiment"))
 
 
-def randomize():
-    """Exact 50/50 split of real, non-excluded customers; app_state.randomized is the lock."""
+def _lock_split(target_state, minimum, messages):
+    """Draw the exact 50/50 split and lock it, optionally moving the state in the same commit.
+
+    The atomic condition `randomized = false AND state = 'BETWEEN'` is the single-use lock:
+    two clicks (or two tabs) cannot both win, and the assignments only exist when the lock
+    update succeeded. Returns a small summary dict, or None when the request was refused.
+    """
     st = state_row()
-    if st["state"] != "BETWEEN":
-        flash("Randomize works only in BETWEEN (after Round 1 closes).", "error")
-        return redirect(url_for("admin.experiment"))
     if st["randomized"]:
-        flash("Already randomised. The split is locked and cannot be redrawn.", "error")
-        return redirect(url_for("admin.experiment"))
+        flash(messages["already"], "error")
+        return None
+    if st["state"] != "BETWEEN":
+        flash(messages["state"], "error")
+        return None
 
     ids = [r["id"] for r in query(
         "select id from participants where source = 'real' and excluded = false order by id")]
-    if not ids:
-        flash("No real customers to randomise yet.", "error")
-        return redirect(url_for("admin.experiment"))
+    if len(ids) < minimum:
+        flash(messages["few"], "error")
+        return None
 
     seed = secrets.randbelow(1_000_000_000)
     shuffled = ids[:]
@@ -405,20 +438,48 @@ def randomize():
 
     with transaction() as conn:
         locked = conn.execute(
-            "update app_state set randomized = true, seed = %s "
-            "where id = 1 and randomized = false returning id", (seed,)).fetchone()
+            "update app_state set randomized = true, seed = %s, state = %s "
+            "where id = 1 and randomized = false and state = 'BETWEEN' returning id",
+            (seed, target_state)).fetchone()
         if locked is None:                       # a second click lost the race
             conn.rollback()
-            flash("Already randomised. The split is locked.", "error")
-            return redirect(url_for("admin.experiment"))
+            flash(messages["race"], "error")
+            return None
         with conn.cursor() as cur:
             cur.executemany(
                 "insert into assignments (participant_id, t, e, seed) values (%s, %s, %s, %s) "
                 "on conflict (participant_id) do nothing",
                 [(pid, 1 if pid in treated else 0, e, seed) for pid in ids])
 
-    flash(f"Randomised {len(ids)} customers: {treated_count} coupon, {len(ids) - treated_count} control. "
-          f"Seed {seed}. The split is locked.", "ok")
+    return {"n": len(ids), "treated": treated_count, "control": len(ids) - treated_count,
+            "seed": seed}
+
+
+def randomize():
+    """Exact 50/50 split of real, non-excluded customers; app_state.randomized is the lock."""
+    result = _lock_split("BETWEEN", 1, {
+        "already": "Already randomised. The split is locked and cannot be redrawn.",
+        "state": "Randomize works only in BETWEEN (after Round 1 closes).",
+        "few": "No real customers to randomise yet.",
+        "race": "Already randomised. The split is locked.",
+    })
+    if result:
+        flash(f"Randomised {result['n']} customers: {result['treated']} coupon, "
+              f"{result['control']} control. Seed {result['seed']}. The split is locked.", "ok")
+    return redirect(url_for("admin.experiment"))
+
+
+def launch():
+    """One click: lock the split and open Round 2, so the coupon goes live immediately."""
+    result = _lock_split("ROUND2", 2, {
+        "already": "Already randomised. The treatment is already live; the split is locked.",
+        "state": "The treatment can only be launched in BETWEEN, after Round 1 closes.",
+        "few": "Need at least 2 real customers before launching the treatment.",
+        "race": "Someone else just launched it or the state changed. The split is locked.",
+    })
+    if result:
+        flash(f"Treatment launched on {result['n']} real customers: {result['treated']} coupon, "
+              f"{result['control']} control. State is now ROUND2 and the split is locked.", "ok")
     return redirect(url_for("admin.experiment"))
 
 

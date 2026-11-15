@@ -131,7 +131,8 @@ A "likely buyer" model puts sure things at the top. An uplift model puts persuad
 | --- | --- | --- | --- |
 | `DATABASE_URL` | Yes | Only for `/predict/user` and `/graphs` | Supabase **Transaction pooler** string (port 6543), password included |
 | `SECRET_KEY` | Yes | No | Long random string, signs session cookies |
-| `ADMIN_PASSWORD` | Yes | No | Single admin login |
+| `ADMIN_ID` | Yes | No | Admin account ID (defaults to `admin`) |
+| `ADMIN_PASSWORD` | Yes | No | Admin password; both halves are required |
 | `ML_API_URL` | Yes | No | Base URL of project 2 |
 | `ML_API_KEY` | Yes | Yes | Same random value in both; sent as `X-API-Key` |
 
@@ -359,7 +360,7 @@ The shop is a fake: **cash on delivery only, nothing is delivered or charged.** 
 3. Open the Supabase SQL editor and run `sql/schema.sql`, then `sql/seed_products.sql`.
 4. Press **Connect** in Supabase and copy the **Transaction pooler** connection string (port 6543). Put it in a local `.env` as `DATABASE_URL`. Never commit `.env`.
 5. Run the starter app locally (`python app.py`) and open `/health`. It should list the table counts.
-6. Create a private GitHub repo, push the folder, then import the repo at vercel.com. Vercel detects Flask. Add the environment variables `DATABASE_URL`, `SECRET_KEY` and `ADMIN_PASSWORD` (the last is for the admin side, which you do not build; just set it). Deploy.
+6. Create a private GitHub repo, push the folder, then import the repo at vercel.com. Vercel detects Flask. Add `DATABASE_URL`, `SECRET_KEY`, `ADMIN_ID`, `ADMIN_PASSWORD`, `ML_API_URL` and `ML_API_KEY`. `vercel.json` gives `app.py` a 60-second budget. Deploy.
 7. Open `https://<project>.vercel.app/health`. **Do not continue until this works.** It proves Vercel can reach Supabase.
 
 ### 5.3 Rules for how you build
@@ -716,16 +717,16 @@ A desktop-first console in the same Flask app, under `/admin`, with its own temp
 
 | Rule | Detail |
 | --- | --- |
-| Access | `/admin/login` takes one password (`ADMIN_PASSWORD`), compared in constant time, with a throttle after 5 wrong tries. A signed `is_admin` flag lives in the session. Everything else under `/admin` and every `/api/` data endpoint requires it (redirect or 401). A customer session never grants admin access |
-| Layout | Left sidebar: Overview, Customers, Orders, Experiment, Results, Model, Data. A top bar with the current state and round, a Real or Synthetic source switch, and a SIMULATED badge when Synthetic is selected |
+| Access | `/login` is a neutral role chooser (customer or admin); `/admin/login` takes an account ID (`ADMIN_ID`) and a password (`ADMIN_PASSWORD`), both compared in constant time, with a throttle after 5 wrong tries. A signed `is_admin` flag lives in the session. Everything else under `/admin` and every `/api/` data endpoint requires it (redirect or 401). A customer session never grants admin access |
+| Layout | Left sidebar: Overview, Customers, Orders, Experiment, Results, Model, Data, using the same palette, cards, buttons and emoji icons as the shop. A top bar with the current state and round, a Real or Synthetic source switch, and a SIMULATED badge when Synthetic is selected |
 
 | Page | Content |
 | --- | --- |
-| **Overview** | KPI cards (customers, orders per round, state); funnel chart per round (view, cart, checkout, order); orders over time with the rounds shaded; customer-type doughnut (click a slice to filter); coupon effect with intervals, exact p-value and a verdict badge; a power calculator (two number inputs) |
+| **Overview** | A big bold uplift hero (effect in percentage points, group sizes, exact p, interval, verdict, provisional badge) with a next-step CTA; KPI cards (customers, orders per round, state); funnel chart per round (view, cart, checkout, order); orders over time with the rounds shaded; customer-type doughnut (click a slice to filter); coupon effect with intervals, exact p-value and a verdict badge; a power calculator (two number inputs) |
 | **Customers** | Table with nickname, type tag, views, cart adds, orders, spend, group, excluded flag; search; a click opens the customer's orders and event timeline; a **Score** button using the ML service |
 | **Orders** | Every order with customer, round, subtotal, discount, total, coupon flag; filters for round and coupon |
-| **Experiment** | State buttons (Start Round 1, Close Round 1, Randomize, Start Round 2, Close Round 2). Illegal moves are refused on the server. Randomize works only in BETWEEN and only once. Shows the seed, a balance table and a tag-by-group table. Remove-customer (test accounts) only before randomization |
-| **Results** | Group sizes, effect on order rate and revenue, exact p-value, bootstrap interval, verdict and reason, power table, "provisional" banner until the state is CLOSED, a warning when the Round 2 order rate is 0% or 100% |
+| **Experiment** | **Launch treatment** in one click (exact 50/50 split plus Round 2 in one transaction), plus the state buttons (Start Round 1, Close Round 1, Randomize, Start Round 2, Close Round 2). Illegal moves are refused on the server. Randomize/launch work only in BETWEEN and only once. Shows the seed, a balance table and a tag-by-group table. Remove-customer (test accounts) only before randomization |
+| **Results** | The same big bold uplift hero, group sizes, effect on order rate and revenue, exact p-value, bootstrap interval, verdict and reason, power table, "provisional" banner until the state is CLOSED, a warning when the Round 2 order rate is 0% or 100% |
 | **Model** (always SIMULATED) | Coupon-size dropdown (50, 100, 150); strategy bars with interval whiskers; a **budget slider** showing profit of uplift, traditional and random at the chosen share; Qini curves with hover and a clickable legend; observed effect by score group; the honesty table (matters versus does nothing) |
 | **Data** | Export CSV, and "Reset real data" (allowed only before randomization; never touches synthetic rows) |
 

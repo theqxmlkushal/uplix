@@ -1,8 +1,8 @@
-"""Flask app for the customer shop (Member A, README section 5).
+"""Flask app for Uplix Live (shop + admin + ML console in one deployment).
 
 Vercel finds `app` in this file with no extra configuration. The customer routes live in the
-`shop` blueprint (shop.py); this file only wires it up, keeps the /health check from the starter,
-and turns errors into a friendly page.
+`shop` blueprint (shop.py), the admin routes in `admin` (admin.py); this file wires both up,
+serves the neutral role chooser, keeps the /health check, and turns errors into a friendly page.
 """
 import os
 
@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 load_dotenv()                              # local .env only; never overrides a var already set
                                             # (tests set DATABASE_URL themselves first, so they stay in charge)
 
-from flask import Flask, jsonify, render_template, send_from_directory
+from flask import Flask, jsonify, redirect, render_template, send_from_directory, session, url_for
 
 from admin import admin
 from db import close_connection, query
@@ -19,9 +19,35 @@ from shop import shop
 
 app = Flask(__name__, static_folder=None)           # on Vercel, static files live in public/
 app.secret_key = os.environ.get("SECRET_KEY", "dev-only-change-me")
+
+# Cookies work on both localhost and Vercel. Secure cookies are on whenever Vercel runs the
+# app (VERCEL=1); SESSION_COOKIE_SECURE can override that for a custom HTTPS host or a test.
+secure_override = os.environ.get("SESSION_COOKIE_SECURE")
+app.config.update(
+    SESSION_COOKIE_NAME="uplix_session",
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=(
+        secure_override.strip().lower() in ("1", "true", "yes", "on")
+        if secure_override is not None else bool(os.environ.get("VERCEL"))
+    ),
+)
+
 app.register_blueprint(shop)
 app.register_blueprint(admin)
 app.teardown_appcontext(close_connection)              # one connection per request, closed here
+
+
+@app.route("/login")
+def choose_role():
+    """Neutral role chooser: customers go to the shop, staff go to the admin console.
+
+    It lives outside both blueprints on purpose. Shop pages therefore never contain an
+    `/admin` link (A14); the choice between the two sides happens here instead.
+    """
+    if session.get("is_admin") is True:
+        return redirect(url_for("admin.overview"))
+    return render_template("login.html")
 
 
 @app.route("/health")
@@ -49,6 +75,12 @@ def admin_css():
 def admin_js():
     """The console's chart and interaction code (plain vanilla, no CDN)."""
     return send_from_directory(os.path.join(app.root_path, "public"), "admin.js")
+
+
+@app.route("/favicon.svg")
+def favicon():
+    """The small shop mark; on Vercel the public/ folder serves it directly."""
+    return send_from_directory(os.path.join(app.root_path, "public"), "favicon.svg")
 
 
 def error_page(message, code):

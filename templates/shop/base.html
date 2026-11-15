@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Uplix Live{% endblock %}</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/shop.css">
 </head>
 <body>
@@ -23,7 +24,7 @@
       <span class="who">{{ me.nickname }}</span>
       <a href="/signout">Sign out</a>
       {% else %}
-      <a href="/signin">Sign in</a>
+      <a href="/login">Sign in</a>
       {% endif %}
     </nav>
   </header>

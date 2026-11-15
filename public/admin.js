@@ -8,16 +8,16 @@
 
   var NS = 'http://www.w3.org/2000/svg';
   var C = {
-    brand: '#2f5bea',
-    brandSoft: '#e8eefe',
-    coupon: '#0e7a63',
-    control: '#5b4bb8',
-    traditional: '#b9a3e3',
+    brand: '#22b8cf',
+    brandSoft: '#e7f7fa',
+    coupon: '#147d91',
+    control: '#6b7280',
+    traditional: '#c3cbd4',
     warn: '#a35a00',
-    ink: '#2c3648',
-    muted: '#6b7789',
-    line: '#d8dee8',
-    grid: '#eef1f6',
+    ink: '#14161c',
+    muted: '#6b7280',
+    line: '#d8dee4',
+    grid: '#eef1f4',
     paper: '#ffffff'
   };
 
@@ -164,7 +164,7 @@
         class: 'round-shade', rx: 3
       }));
       if (x2 - x1 > 34) {
-        label(svg, (x1 + x2) / 2, T - 12, 'Round ' + b.round, 'middle', '#9aa6b8', 10);
+        label(svg, (x1 + x2) / 2, T - 12, 'Round ' + b.round, 'middle', '#9aa6b4', 10);
       }
     });
 
@@ -198,9 +198,9 @@
   /* ---------------------------------------------------------------- doughnut */
   function doughnut(host, rows) {
     if (!clear(host)) { return; }
-    var palette = ['#2f5bea', '#0e7a63', '#c98a1b', '#5b4bb8'];
+    var palette = ['#22b8cf', '#147d91', '#e0a21b', '#6b7280'];
     var total = rows.reduce(function (sum, row) { return sum + row.n; }, 0);
-    var W = 420, H = 250, cx = 130, cy = 125, outer = 92, inner = 56;
+    var W = 560, H = 250, cx = 130, cy = 125, outer = 92, inner = 56;
     var svg = canvas(W, H);
 
     if (!total) {
@@ -232,12 +232,15 @@
       svg.appendChild(slice);
       angle = end;
 
-      var mid = (angle - sweep / 2);
-      var lx = cx + (outer + 18) * Math.cos(mid);
-      var ly = cy + (outer + 18) * Math.sin(mid);
-      if (W - lx > 20) {
-        label(svg, lx, ly + 4, row.tag + ' ' + row.n, lx > cx ? 'start' : 'end', C.ink, 11);
-      }
+      // A right-hand legend keeps every label readable at any width; radial labels were
+      // clipped on the left when the dashboard was narrow.
+      var ly = 34 + i * 36;
+      svg.appendChild(node('rect', {
+        x: 270, y: ly - 12, width: 14, height: 14, rx: 4,
+        fill: palette[i % palette.length]
+      }));
+      label(svg, 294, ly, row.tag, 'start', C.ink, 12);
+      label(svg, W - 14, ly, fmt(row.n) + ' · ' + pct(row.n / total, 0), 'end', C.muted, 12);
     });
     label(svg, cx, cy - 2, fmt(total), 'middle', C.ink, 22);
     label(svg, cx, cy + 16, 'customers', 'middle', C.muted, 10);
@@ -297,7 +300,7 @@
       var negative = row.value < 0;
       svg.appendChild(node('rect', {
         x: L, y: cy - 9, width: width, height: 18, rx: 3,
-        fill: options.negative ? (negative ? '#b42318' : C.brand) : (row.fill || C.brand)
+        fill: options.negative ? (negative ? '#d94848' : C.brand) : (row.fill || C.brand)
       }));
       if (row.lo !== null && row.hi !== null && row.lo !== undefined && row.hi !== undefined) {
         var x1 = L + (Math.max(0, row.lo) / max) * innerW;
@@ -385,7 +388,7 @@
       var block = graphs.by_coupon[key];
 
       horizontalBars(els.strategy, block.strategies.map(function (s) {
-        return { name: s.name, value: s.value, lo: s.lo, hi: s.hi, fill: /Uplift/i.test(s.name) ? C.brand : '#aebbd0' };
+        return { name: s.name, value: s.value, lo: s.lo, hi: s.hi, fill: /Uplift/i.test(s.name) ? C.brand : '#c3cbd4' };
       }), { labelWidth: 200, rowHeight: 38 });
 
       if (els.differences) {

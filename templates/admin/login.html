@@ -4,17 +4,24 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Admin sign in · Uplix Live</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/admin.css">
 </head>
 <body class="login-body">
   <form class="login-card" method="post" action="{{ url_for('admin.login') }}">
+    <span class="login-mark" aria-hidden="true">&#128274;</span>
     <h1>Uplix <b>Admin</b></h1>
-    <p class="muted">One password, five tries, then a pause.</p>
+    <p class="muted">Admin sign in with your account ID and password.</p>
     <input type="hidden" name="next" value="{{ next }}">
+    <label for="admin_id">Account ID</label>
+    <input id="admin_id" name="admin_id" type="text" value="{{ admin_id }}"
+           autocomplete="username" autocapitalize="none" spellcheck="false" required autofocus>
     <label for="password">Password</label>
-    <input id="password" name="password" type="password" autocomplete="current-password" required autofocus>
+    <input id="password" name="password" type="password" autocomplete="current-password" required>
     {% if error %}<p class="error">{{ error }}</p>{% endif %}
     <button type="submit" class="primary">Sign in</button>
+    <p class="muted small">Five wrong tries, then a short pause.</p>
+    <p class="muted small"><a href="/login">Customer instead? Change role</a></p>
     <p class="muted small"><a href="/">Back to the shop</a></p>
   </form>
 </body>

@@ -10,26 +10,41 @@
   <div class="card kpi"><span class="label">Coupon</span><span class="value small-value">{{ state.coupon_amount }} over {{ state.coupon_min_subtotal }}</span></div>
 </div>
 
+{% if state.state == 'BETWEEN' and not state.randomized %}
+<section class="card launch-card">
+  <div>
+    <p class="eyebrow">One-click treatment</p>
+    <h2>Launch on the real customers you have</h2>
+    <p class="muted small">Draws the exact 50/50 split and opens Round 2 in one transaction.
+      The coupon goes live for the treated group immediately; the split locks on the first click.</p>
+  </div>
+  <form method="post" action="{{ url_for('admin.move', action='launch') }}">
+    <button class="primary big">&#9889; Launch treatment</button>
+  </form>
+</section>
+{% endif %}
+
 <section class="card">
   <h2>State machine</h2>
   <p class="muted small">Only legal moves are allowed, and the server refuses anything else.
-    Randomize works only in BETWEEN, only once; its seed is stored with every assignment.</p>
+    Randomize works only in BETWEEN, only once; its seed is stored with every assignment.
+    Launch is the shortcut that randomizes and starts Round 2 together.</p>
   <div class="steps">
     <form method="post" action="{{ url_for('admin.move', action='start-round1') }}">
-      <button class="primary" {{ 'disabled' if state.state != 'SETUP' }}>Start Round 1</button>
+      <button class="primary" {{ 'disabled' if state.state != 'SETUP' }}>&#9654; Start Round 1</button>
     </form>
     <form method="post" action="{{ url_for('admin.move', action='close-round1') }}">
-      <button class="primary" {{ 'disabled' if state.state != 'ROUND1' }}>Close Round 1</button>
+      <button class="primary" {{ 'disabled' if state.state != 'ROUND1' }}>&#10003; Close Round 1</button>
     </form>
     <form method="post" action="{{ url_for('admin.move', action='randomize') }}">
       <button class="warn-btn"
-        {{ 'disabled' if state.state != 'BETWEEN' or state.randomized }}>Randomize</button>
+        {{ 'disabled' if state.state != 'BETWEEN' or state.randomized }}>&#127922; Randomize</button>
     </form>
     <form method="post" action="{{ url_for('admin.move', action='start-round2') }}">
-      <button class="primary" {{ 'disabled' if state.state != 'BETWEEN' or not state.randomized }}>Start Round 2</button>
+      <button class="primary" {{ 'disabled' if state.state != 'BETWEEN' or not state.randomized }}>&#9654; Start Round 2</button>
     </form>
     <form method="post" action="{{ url_for('admin.move', action='close-round2') }}">
-      <button class="primary" {{ 'disabled' if state.state != 'ROUND2' }}>Close Round 2</button>
+      <button class="primary" {{ 'disabled' if state.state != 'ROUND2' }}>&#10003; Close Round 2</button>
     </form>
   </div>
   {% if state.randomized %}

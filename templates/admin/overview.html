@@ -1,7 +1,58 @@
 {% extends "admin/base.html" %}
+{% from "admin/_uplift.html" import uplift_number with context %}
 {% block title %}Overview{% endblock %}
 {% block body %}
 <h1>Overview <span class="muted mono">{{ source }}</span></h1>
+
+<section class="card uplift-card">
+  <div class="uplift-main">
+    {{ uplift_number(effect, state, source) }}
+  </div>
+  <div class="uplift-side">
+    {% if source == 'real' %}
+      {% if state.state == 'SETUP' %}
+        <p class="eyebrow">Next step</p>
+        <form method="post" action="{{ url_for('admin.move', action='start-round1') }}">
+          <button type="submit" class="primary big">&#9654; Start Round 1</button>
+        </form>
+        <p class="muted small">Customers browse and order; no coupon text appears yet.</p>
+      {% elif state.state == 'ROUND1' %}
+        <p class="eyebrow">Next step</p>
+        <form method="post" action="{{ url_for('admin.move', action='close-round1') }}">
+          <button type="submit" class="primary big">&#10003; Close Round 1</button>
+        </form>
+        <p class="muted small">Round 1 is collecting the behaviour the split is based on.</p>
+      {% elif state.state == 'BETWEEN' and not state.randomized %}
+        <p class="eyebrow">One click</p>
+        <form method="post" action="{{ url_for('admin.move', action='launch') }}">
+          <button type="submit" class="primary big">&#9889; Launch treatment</button>
+        </form>
+        <p class="muted small">Splits every real customer 50/50 and opens Round 2 immediately.
+          The split locks on the first click.</p>
+      {% elif state.state == 'BETWEEN' %}
+        <p class="eyebrow">Next step</p>
+        <form method="post" action="{{ url_for('admin.move', action='start-round2') }}">
+          <button type="submit" class="primary big">&#9654; Start Round 2</button>
+        </form>
+        <p class="muted small">The split is locked. Open Round 2 when you are ready.</p>
+      {% elif state.state == 'ROUND2' %}
+        <p class="eyebrow">Next step</p>
+        <form method="post" action="{{ url_for('admin.move', action='close-round2') }}">
+          <button type="submit" class="primary big">&#10003; Close Round 2</button>
+        </form>
+        <p class="muted small">Close when the treatment window ends to make the result final.</p>
+      {% else %}
+        <p class="eyebrow">Experiment complete</p>
+        <p class="muted small">The result above is final. Export the CSV from Data.</p>
+      {% endif %}
+      <p class="side-link"><a class="button" href="{{ url_for('admin.experiment', source=source) }}">Open experiment</a></p>
+    {% else %}
+      <p class="eyebrow">Simulated source</p>
+      <p class="muted small">Actions always apply to real customers. Switch to Real to run the
+        experiment; this page is showing the synthetic training data.</p>
+    {% endif %}
+  </div>
+</section>
 
 <div class="cards">
   <div class="card kpi"><span class="label">Customers</span><span class="value">{{ counts.customers }}</span></div>

@@ -1,0 +1,27 @@
+{% macro uplift_number(effect, state, source) %}
+  <span class="eyebrow">
+    {% if source == 'synthetic' %}Simulated{% else %}Measured{% endif %} uplift &middot; order rate
+  </span>
+  {% if effect %}
+    {% set pp = 100 * effect.effect %}
+    <div class="uplift-hero {{ 'down' if pp < 0 else 'up' }}">
+      {{ '%+.1f'|format(pp) }}<span class="unit">pp</span>
+    </div>
+    <p class="uplift-sub">
+      Coupon {{ percent(effect.rate_treated) }} &middot; control {{ percent(effect.rate_control) }}
+      &middot; {{ effect.n_treated }} vs {{ effect.n_control }} customers
+    </p>
+    <p class="uplift-sub">
+      Exact p {{ '%.4f'|format(effect.p_value) }} &middot; 95% interval
+      {% if effect.lo is none %}&mdash;{% else %}{{ '%+.1f'|format(100 * effect.lo) }} to
+      {{ '%+.1f'|format(100 * effect.hi) }} pp{% endif %}
+      <span class="badge {{ effect.verdict }}">{{ effect.verdict }}</span>
+      {% if source == 'real' and state.state != 'CLOSED' %}
+      <span class="badge sim">provisional</span>
+      {% endif %}
+    </p>
+  {% else %}
+    <div class="uplift-hero empty">&mdash;<span class="unit">pp</span></div>
+    <p class="uplift-sub">No split yet. Run Round 1, then launch the treatment to measure the uplift.</p>
+  {% endif %}
+{% endmacro %}
