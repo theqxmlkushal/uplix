@@ -1,0 +1,82 @@
+{% extends "admin/base.html" %}
+{% block title %}Results{% endblock %}
+{% block body %}
+<h1>Results <span class="muted mono">{{ source }}</span></h1>
+
+{% if provisional %}
+<div class="flash notice">Provisional: the state is {{ state.state }}, so the numbers can still change. They become final at CLOSED.</div>
+{% endif %}
+{% if warning %}
+<div class="flash error">{{ warning }}</div>
+{% endif %}
+
+{% if not effect %}
+<section class="card">
+  <h2>No split yet</h2>
+  <p class="muted">There are no assignments for this source. Randomize on the Experiment page first.</p>
+</section>
+{% else %}
+<div class="cards">
+  <div class="card kpi"><span class="label">Customers</span><span class="value">{{ effect.n }}</span></div>
+  <div class="card kpi"><span class="label">Coupon group</span><span class="value">{{ effect.n_treated }}</span></div>
+  <div class="card kpi"><span class="label">Control group</span><span class="value">{{ effect.n_control }}</span></div>
+  <div class="card kpi"><span class="label">Verdict</span><span class="value small-value"><span class="badge {{ effect.verdict }}">{{ effect.verdict }}</span></span></div>
+</div>
+
+<section class="card">
+  <h2>Effect on the order rate</h2>
+  <table class="mini">
+    <tr><td>Order rate, coupon</td><td>{{ percent(effect.rate_treated) }}</td></tr>
+    <tr><td>Order rate, control</td><td>{{ percent(effect.rate_control) }}</td></tr>
+    <tr><td><b>Effect</b></td><td><b>{{ '%+.1f' % (100 * effect.effect) }} percentage points</b></td></tr>
+    <tr><td>Exact p-value</td><td>{{ '%.4f' % effect.p_value }}</td></tr>
+    <tr><td>Bootstrap interval</td><td>{% if effect.lo is none %}&mdash;{% else %}{{ '%+.1f'|format(100 * effect.lo) }} to {{ '%+.1f'|format(100 * effect.hi) }} pp{% endif %}</td></tr>
+  </table>
+  <p class="muted small">Exact randomization test over every split when the group is small;
+    a seeded random sample of splits when it is large. The interval is a percentile bootstrap.</p>
+  {% if effect.reasons %}
+  <h3>Why it is not reliable yet</h3>
+  <ul class="reasons">{% for reason in effect.reasons %}<li>{{ reason }}</li>{% endfor %}</ul>
+  {% endif %}
+</section>
+
+<section class="card">
+  <h2>Effect on revenue per customer</h2>
+  {% if effect.revenue %}
+  <table class="mini">
+    <tr><td>Coupon group</td><td>{{ money(effect.revenue.treated) }}</td></tr>
+    <tr><td>Control group</td><td>{{ money(effect.revenue.control) }}</td></tr>
+    <tr><td><b>Effect</b></td><td><b>{{ '%+.0f'|format(effect.revenue.effect) }}</b></td></tr>
+    <tr><td>Bootstrap interval</td><td>{{ '%+.0f'|format(effect.revenue.lo) }} to {{ '%+.0f'|format(effect.revenue.hi) }}</td></tr>
+  </table>
+  <p class="muted small">Revenue is per customer in Round 2. The interval is rough at this size.</p>
+  {% else %}<p class="muted">Not enough data yet.</p>{% endif %}
+</section>
+{% endif %}
+
+<section class="card">
+  <h2>How many customers you would need</h2>
+  <div class="power-row">
+    <label>Baseline % <input id="power-p1" type="number" min="1" max="99" value="20" step="1"></label>
+    <label>Target % <input id="power-p2" type="number" min="1" max="99" value="30" step="1"></label>
+    <span class="power-out">per group: <b id="power-n">291</b></span>
+  </div>
+  <table class="table compact">
+    <thead><tr><th>Baseline</th><th>Target</th><th>Per group</th></tr></thead>
+    <tbody>
+      {% for p1, p2, n in power_rows %}
+      <tr><td>{{ (100 * p1)|round|int }}%</td><td>{{ (100 * p2)|round|int }}%</td><td>{{ n }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="muted small">"Reliable" needs 40 or more customers, an exact p below 0.05 and an interval that excludes zero.</p>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>
+  (function () {
+    UplixAdmin.power(document.getElementById('power-p1'), document.getElementById('power-p2'),
+                     document.getElementById('power-n'));
+  })();
+</script>
+{% endblock %}

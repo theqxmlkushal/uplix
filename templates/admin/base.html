@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Admin{% endblock %} · Uplix Live</title>
+  <link rel="stylesheet" href="/admin.css">
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar">
+    <div class="brand">Uplix <b>Admin</b></div>
+    <nav class="nav">
+      {% set items = [('admin.overview','Overview'), ('admin.customers','Customers'),
+                      ('admin.orders','Orders'), ('admin.experiment','Experiment'),
+                      ('admin.results','Results'), ('admin.model','Model'), ('admin.data','Data')] %}
+      {% for endpoint, label in items %}
+        <a href="{{ url_for(endpoint, source=source) }}"
+           class="{% if request.endpoint == endpoint %}active{% endif %}">{{ label }}</a>
+      {% endfor %}
+    </nav>
+    <div class="sidebar-foot">
+      <a href="/" target="_blank" rel="noopener">Open shop &#8599;</a>
+      <form method="post" action="{{ url_for('admin.logout') }}">
+        <button type="submit" class="link">Sign out</button>
+      </form>
+    </div>
+  </aside>
+
+  <div class="content">
+    <header class="topbar">
+      <div class="state-line">
+        <span class="dot {{ state.state|lower }}"></span>
+        <b>{{ state.state }}</b>
+        <span class="muted">{% if round_no %}Round {{ round_no }} open{% else %}no open round{% endif %}</span>
+        {% if state.randomized %}<span class="badge lock">split locked</span>{% endif %}
+      </div>
+      <div class="switch">
+        <a href="{{ switch_url('real') }}" class="{{ 'on' if source == 'real' }}">Real</a>
+        <a href="{{ switch_url('synthetic') }}" class="{{ 'on' if source == 'synthetic' }}">Synthetic</a>
+        {% if source == 'synthetic' %}<span class="badge sim">SIMULATED</span>{% endif %}
+      </div>
+    </header>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="flash {{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+
+    <main>{% block body %}{% endblock %}</main>
+  </div>
+</div>
+<script src="/admin.js"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

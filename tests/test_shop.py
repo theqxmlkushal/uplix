@@ -473,8 +473,12 @@ def test_a13_coupon_seen_is_logged_exactly_once(client):
     assert rounds(pid, "coupon_seen") == [2]
 
 
-def test_a14_there_is_no_admin_route_and_no_admin_link(client):
-    """A14: no customer page links to /admin, and /admin does not exist here."""
+def test_a14_there_is_no_admin_link_on_customer_pages(client):
+    """A14: no customer page links to /admin.
+
+    In the merged project /admin exists (Member B), but a signed-in customer session still
+    cannot open it: it lands on the admin password page and stays there.
+    """
     set_state("ROUND1")
     signup(client, "normie")
     add_to_cart(client, 1, 1)
@@ -482,8 +486,10 @@ def test_a14_there_is_no_admin_route_and_no_admin_link(client):
     for path in ("/", "/product/1", "/cart", "/checkout", "/orders", "/signup", "/signin"):
         html = client.get(path, follow_redirects=True).get_data(as_text=True)
         assert 'href="/admin' not in html and 'action="/admin' not in html, path
-    assert client.get("/admin").status_code == 404
-    for filename in ("shop.py", "app.py"):
+    merged = client.get("/admin", follow_redirects=True)
+    assert merged.status_code == 200
+    assert "Admin sign in" in merged.get_data(as_text=True)
+    for filename in ("shop.py",):
         with open(os.path.join(SHOP_DIR, filename), encoding="utf-8") as handle:
             source = handle.read()
         assert '"/admin' not in source and "'/admin" not in source, filename

@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Admin sign in · Uplix Live</title>
+  <link rel="stylesheet" href="/admin.css">
+</head>
+<body class="login-body">
+  <form class="login-card" method="post" action="{{ url_for('admin.login') }}">
+    <h1>Uplix <b>Admin</b></h1>
+    <p class="muted">One password, five tries, then a pause.</p>
+    <input type="hidden" name="next" value="{{ next }}">
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" autocomplete="current-password" required autofocus>
+    {% if error %}<p class="error">{{ error }}</p>{% endif %}
+    <button type="submit" class="primary">Sign in</button>
+    <p class="muted small"><a href="/">Back to the shop</a></p>
+  </form>
+</body>
+</html>

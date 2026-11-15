@@ -1,0 +1,49 @@
+{% extends "admin/base.html" %}
+{% block title %}Data{% endblock %}
+{% block body %}
+<h1>Data</h1>
+
+<div class="cards">
+  <div class="card kpi"><span class="label">Real customers</span><span class="value">{{ counts.real_n }}</span></div>
+  <div class="card kpi"><span class="label">Real orders</span><span class="value">{{ counts.real_orders }}</span></div>
+  <div class="card kpi"><span class="label">Synthetic customers</span><span class="value">{{ counts.synthetic_n }}</span></div>
+  <div class="card kpi"><span class="label">State</span><span class="value small-value">{{ state.state }}</span></div>
+</div>
+
+<section class="card">
+  <h2>Export CSV</h2>
+  <p class="muted">One row per customer: Round 1 features, type tag, group and the Round 2 outcome.
+    Export the real file after the run, then copy the tables out of Supabase.</p>
+  <div class="steps">
+    <a class="button primary" href="{{ url_for('admin.export_csv', source='real') }}">Download real CSV</a>
+    <a class="button" href="{{ url_for('admin.export_csv', source='synthetic') }}">Download synthetic CSV</a>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Reset real data</h2>
+  {% if state.randomized and state.state != 'CLOSED' %}
+  <p class="muted">Refused while the split is locked. Close Round 2 first, then reset for the next run.</p>
+  <button class="warn-btn" disabled>Reset real data</button>
+  {% else %}
+  <p class="muted">Deletes real customers, their events, orders and assignments, and puts the state
+    back to <b>SETUP</b>. Synthetic rows and the ML model are never touched.</p>
+  <form method="post" action="{{ url_for('admin.reset_real_data') }}"
+        onsubmit="return confirm('Delete every real customer, event, order and assignment? This cannot be undone.');">
+    <button type="submit" class="warn-btn">Reset real data</button>
+  </form>
+  {% endif %}
+</section>
+
+<section class="card">
+  <h2>Where the data lives</h2>
+  <table class="mini">
+    <tr><td>Real participants</td><td><code>participants where source = 'real'</code></td></tr>
+    <tr><td>Synthetic participants</td><td><code>participants where source = 'synthetic'</code></td></tr>
+    <tr><td>Split</td><td><code>assignments</code> (t = 1 coupon, t = 0 control)</td></tr>
+    <tr><td>Round 2 outcome</td><td><code>v_features</code> (Y_order_r2, revenue_r2)</td></tr>
+    <tr><td>Experiment state</td><td><code>app_state</code> (single row, id = 1)</td></tr>
+    <tr><td>Model runs</td><td><code>model_runs</code></td></tr>
+  </table>
+</section>
+{% endblock %}

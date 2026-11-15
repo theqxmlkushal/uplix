@@ -13,12 +13,15 @@ load_dotenv()                              # local .env only; never overrides a 
 
 from flask import Flask, jsonify, render_template, send_from_directory
 
-from db import query
+from admin import admin
+from db import close_connection, query
 from shop import shop
 
 app = Flask(__name__, static_folder=None)           # on Vercel, static files live in public/
 app.secret_key = os.environ.get("SECRET_KEY", "dev-only-change-me")
 app.register_blueprint(shop)
+app.register_blueprint(admin)
+app.teardown_appcontext(close_connection)              # one connection per request, closed here
 
 
 @app.route("/health")
@@ -34,6 +37,18 @@ def health():
 def shop_css():
     """Serve the stylesheet when running locally; on Vercel the public/ folder is served for us."""
     return send_from_directory(os.path.join(app.root_path, "public"), "shop.css")
+
+
+@app.route("/admin.css")
+def admin_css():
+    """Same arrangement for the console's own stylesheet."""
+    return send_from_directory(os.path.join(app.root_path, "public"), "admin.css")
+
+
+@app.route("/admin.js")
+def admin_js():
+    """The console's chart and interaction code (plain vanilla, no CDN)."""
+    return send_from_directory(os.path.join(app.root_path, "public"), "admin.js")
 
 
 def error_page(message, code):

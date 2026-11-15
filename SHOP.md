@@ -6,7 +6,8 @@ your own orders. Every page carries the banner *"Demo shop: nothing is delivered
 charged"*.
 
 No admin route or admin link exists anywhere in the customer code — that is Member B's
-side (`admin.py`, `templates/admin/` land here later).
+side (`admin.py`, `stats.py`, `tags.py`, `templates/admin/`, `public/admin.*`, see `ADMIN.md`).
+The merged app registers both blueprints and a customer session still cannot open `/admin`.
 
 ## Stack
 

@@ -1,0 +1,7 @@
+{% extends "admin/base.html" %}
+{% block title %}Not found{% endblock %}
+{% block body %}
+<h1>Nothing here</h1>
+<p class="muted">That customer or page does not exist. Use the sidebar to go back.</p>
+<p><a class="button" href="{{ url_for('admin.overview') }}">Overview</a></p>
+{% endblock %}

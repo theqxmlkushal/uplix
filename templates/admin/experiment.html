@@ -1,0 +1,98 @@
+{% extends "admin/base.html" %}
+{% block title %}Experiment{% endblock %}
+{% block body %}
+<h1>Experiment</h1>
+
+<div class="cards">
+  <div class="card kpi"><span class="label">State</span><span class="value small-value">{{ state.state }}</span></div>
+  <div class="card kpi"><span class="label">Randomised</span><span class="value small-value">{{ 'yes' if state.randomized else 'no' }}</span></div>
+  <div class="card kpi"><span class="label">Seed</span><span class="value small-value">{{ state.seed if state.seed is not none else '—' }}</span></div>
+  <div class="card kpi"><span class="label">Coupon</span><span class="value small-value">{{ state.coupon_amount }} over {{ state.coupon_min_subtotal }}</span></div>
+</div>
+
+<section class="card">
+  <h2>State machine</h2>
+  <p class="muted small">Only legal moves are allowed, and the server refuses anything else.
+    Randomize works only in BETWEEN, only once; its seed is stored with every assignment.</p>
+  <div class="steps">
+    <form method="post" action="{{ url_for('admin.move', action='start-round1') }}">
+      <button class="primary" {{ 'disabled' if state.state != 'SETUP' }}>Start Round 1</button>
+    </form>
+    <form method="post" action="{{ url_for('admin.move', action='close-round1') }}">
+      <button class="primary" {{ 'disabled' if state.state != 'ROUND1' }}>Close Round 1</button>
+    </form>
+    <form method="post" action="{{ url_for('admin.move', action='randomize') }}">
+      <button class="warn-btn"
+        {{ 'disabled' if state.state != 'BETWEEN' or state.randomized }}>Randomize</button>
+    </form>
+    <form method="post" action="{{ url_for('admin.move', action='start-round2') }}">
+      <button class="primary" {{ 'disabled' if state.state != 'BETWEEN' or not state.randomized }}>Start Round 2</button>
+    </form>
+    <form method="post" action="{{ url_for('admin.move', action='close-round2') }}">
+      <button class="primary" {{ 'disabled' if state.state != 'ROUND2' }}>Close Round 2</button>
+    </form>
+  </div>
+  {% if state.randomized %}
+  <p class="muted small">The split is locked. Removing customers and resetting real data are closed until the experiment is CLOSED.</p>
+  {% else %}
+  <p class="muted small">Before randomizing you can exclude test accounts below. After randomizing the split cannot change.</p>
+  {% endif %}
+</section>
+
+<div class="grid two">
+  <section class="card">
+    <h2>Balance</h2>
+    {% set total = balance[0] + balance[1] %}
+    <table class="mini">
+      <tr><td>Coupon group</td><td>{{ balance[1] }}</td></tr>
+      <tr><td>Control group</td><td>{{ balance[0] }}</td></tr>
+      <tr><td>e (share treated)</td><td>{{ '%.3f' % (balance[1] / total) if total else '—' }}</td></tr>
+    </table>
+    <p class="muted small">Exact split: the counts differ by at most one.</p>
+  </section>
+
+  <section class="card">
+    <h2>Type by group</h2>
+    <table class="table compact">
+      <thead><tr><th>Type</th><th class="num">Coupon</th><th class="num">Control</th><th class="num">No group</th></tr></thead>
+      <tbody>
+        {% for name, counts in tag_group.items() %}
+        <tr><td><span class="tag {{ name|replace(' ', '-')|lower }}">{{ name }}</span></td>
+            <td class="num">{{ counts[1] }}</td><td class="num">{{ counts[0] }}</td><td class="num">{{ counts[None] }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+</div>
+
+<section class="card">
+  <h2>Real customers <span class="count">{{ counted|length }}</span></h2>
+  <table class="table compact">
+    <thead><tr><th>Customer</th><th>Type</th><th>Group</th><th>Excluded</th>
+      {% if not state.randomized %}<th></th>{% endif %}</tr></thead>
+    <tbody>
+      {% for row in real %}
+      <tr>
+        <td><a href="{{ url_for('admin.customer', user_id=row.user_id) }}">{{ row.nickname }}</a></td>
+        <td><span class="tag {{ row.tag|replace(' ', '-')|lower }}">{{ row.tag }}</span></td>
+        <td>{% if row.group is none %}<span class="muted">—</span>
+            {% elif row.group == 1 %}<span class="badge coupon">coupon</span>
+            {% else %}<span class="badge control">control</span>{% endif %}</td>
+        <td>{% if row.excluded %}<span class="badge warn">excluded</span>{% endif %}</td>
+        {% if not state.randomized %}
+        <td>
+          <form method="post" action="{{ url_for('admin.exclude_customer', user_id=row.user_id) }}">
+            <input type="hidden" name="back" value="{{ url_for('admin.experiment') }}">
+            <input type="hidden" name="action" value="{{ 'restore' if row.excluded else 'exclude' }}">
+            <button class="ghost smallbtn">{{ 'Restore' if row.excluded else 'Exclude' }}</button>
+          </form>
+        </td>
+        {% endif %}
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="muted">No real customers yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

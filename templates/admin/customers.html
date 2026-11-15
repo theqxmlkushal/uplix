@@ -1,0 +1,59 @@
+{% extends "admin/base.html" %}
+{% block title %}Customers{% endblock %}
+{% block body %}
+<h1>Customers <span class="muted mono">{{ source }}</span>
+  <span class="count">{{ shown }}{% if total != shown %} of {{ total }}{% endif %}</span></h1>
+
+<form class="filters" method="get">
+  <input type="search" name="q" value="{{ search }}" placeholder="Search nickname">
+  <input type="hidden" name="source" value="{{ source }}">
+  {% if active_tag %}<input type="hidden" name="tag" value="{{ active_tag }}">{% endif %}
+  <button type="submit">Search</button>
+</form>
+
+<div class="chips">
+  <a href="{{ url_for('admin.customers', source=source) }}" class="{{ 'on' if not active_tag }}">All</a>
+  {% for tag in all_tags %}
+  <a href="{{ url_for('admin.customers', source=source, tag=tag, q=search) }}"
+     class="{{ 'on' if active_tag == tag }}">{{ tag }}</a>
+  {% endfor %}
+</div>
+
+<table class="table">
+  <thead>
+    <tr><th>Customer</th><th>Tag</th><th class="num">Views</th><th class="num">Cart adds</th>
+        <th class="num">Orders</th><th class="num">Spend</th><th>Group</th><th>Excluded</th>
+        {% if source == 'real' and not state.randomized %}<th></th>{% endif %}</tr>
+  </thead>
+  <tbody>
+    {% for row in rows %}
+    <tr>
+      <td><a href="{{ url_for('admin.customer', user_id=row.user_id) }}">{{ row.nickname }}</a></td>
+      <td><span class="tag {{ row.tag|replace(' ', '-')|lower }}">{{ row.tag }}</span></td>
+      <td class="num">{{ row.n_views_r1 }}</td>
+      <td class="num">{{ row.n_cart_adds_r1 }}</td>
+      <td class="num">{{ row.n_orders_r1 }}</td>
+      <td class="num">{{ money(row.r1_spend) }}</td>
+      <td>{% if row.group is none %}<span class="muted">—</span>
+          {% elif row.group == 1 %}<span class="badge coupon">coupon</span>
+          {% else %}<span class="badge control">control</span>{% endif %}</td>
+      <td>{% if row.excluded %}<span class="badge warn">excluded</span>{% endif %}</td>
+      {% if source == 'real' and not state.randomized %}
+      <td>
+        <form method="post" action="{{ url_for('admin.exclude_customer', user_id=row.user_id) }}">
+          <input type="hidden" name="back" value="{{ request.full_path }}">
+          <input type="hidden" name="action" value="{{ 'restore' if row.excluded else 'exclude' }}">
+          <button type="submit" class="ghost smallbtn">{{ 'Restore' if row.excluded else 'Exclude' }}</button>
+        </form>
+      </td>
+      {% endif %}
+    </tr>
+    {% else %}
+    <tr><td colspan="9" class="muted">No customers match.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% if total > shown %}
+<p class="muted small">Showing the first {{ shown }}; search or use a type filter to narrow.</p>
+{% endif %}
+{% endblock %}

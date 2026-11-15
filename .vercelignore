@@ -3,5 +3,4 @@ ml_service
 tests
 tools
 data
-sample_data
 *.ipynb

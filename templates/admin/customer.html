@@ -1,0 +1,98 @@
+{% extends "admin/base.html" %}
+{% block title %}{{ row.nickname }}{% endblock %}
+{% block body %}
+<p><a href="{{ url_for('admin.customers', source=source) }}">&larr; All customers</a></p>
+<h1>{{ row.nickname }} <span class="muted mono">#{{ row.id }}</span></h1>
+
+<div class="grid two">
+  <section class="card">
+    <h2>Profile</h2>
+    <table class="mini">
+      <tr><td>Source</td><td>{{ row.source }}</td></tr>
+      <tr><td>Type tag</td><td><span class="tag {{ row.tag|replace(' ', '-')|lower }}">{{ row.tag }}</span></td></tr>
+      <tr><td>Group</td><td>{% if group %}{% if group.t == 1 %}<span class="badge coupon">coupon</span>{% else %}<span class="badge control">control</span>{% endif %}{% else %}<span class="muted">not randomised</span>{% endif %}</td></tr>
+      <tr><td>Excluded</td><td>{{ 'yes' if row.excluded else 'no' }}</td></tr>
+      <tr><td>Joined</td><td>{{ row.created_at.strftime('%Y-%m-%d %H:%M') }}</td></tr>
+    </table>
+    <table class="mini">
+      <tr><td>Round 1 views</td><td>{{ row.n_views_r1 }}</td></tr>
+      <tr><td>Round 1 cart adds</td><td>{{ row.n_cart_adds_r1 }}</td></tr>
+      <tr><td>Avg price viewed</td><td>{{ money(row.avg_price_viewed_r1) }}</td></tr>
+      <tr><td>Round 1 orders</td><td>{{ row.n_orders_r1 }}</td></tr>
+      <tr><td>Round 1 spend</td><td>{{ money(row.r1_spend) }}</td></tr>
+    </table>
+  </section>
+
+  <section class="card">
+    <h2>Score with the ML service</h2>
+    <p class="muted small">Calls <code>/predict/user/{{ row.id }}</code> server to server. The model was trained on
+      <b>synthetic data</b>: the lane is an illustration of the method, not a validated prediction.</p>
+    <button id="score-btn" class="primary" type="button">Score this customer</button>
+    <div id="score-out" class="score-out muted">No score yet.</div>
+  </section>
+</div>
+
+<section class="card">
+  <h2>Orders</h2>
+  {% if orders %}
+  <table class="table compact">
+    <thead><tr><th>#</th><th>Round</th><th class="num">Subtotal</th><th class="num">Discount</th>
+               <th class="num">Total</th><th>Coupon</th><th>When</th></tr></thead>
+    <tbody>
+      {% for order in orders %}
+      <tr><td>{{ order.id }}</td><td>{{ order.round }}</td><td class="num">{{ money(order.subtotal) }}</td>
+          <td class="num">{{ money(order.discount) }}</td><td class="num">{{ money(order.total) }}</td>
+          <td>{{ 'yes' if order.coupon_applied else 'no' }}</td>
+          <td class="muted">{{ order.created_at.strftime('%m-%d %H:%M') }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="muted">No orders.</p>{% endif %}
+</section>
+
+<section class="card">
+  <h2>Event timeline</h2>
+  {% if events %}
+  <table class="table compact">
+    <thead><tr><th>Round</th><th>Event</th><th>Product</th><th class="num">Value</th><th>When</th></tr></thead>
+    <tbody>
+      {% for event in events %}
+      <tr><td>{{ event.round }}</td><td>{{ event.type }}</td>
+          <td>{{ event.product_id if event.product_id else '—' }}</td>
+          <td class="num">{{ money(event.value) if event.value is not none else '—' }}</td>
+          <td class="muted">{{ event.created_at.strftime('%m-%d %H:%M:%S') }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="muted">No events.</p>{% endif %}
+</section>
+
+<script type="application/json" id="customer-id">{{ row.id }}</script>
+{% endblock %}
+{% block scripts %}
+<script>
+  (function () {
+    var id = JSON.parse(document.getElementById('customer-id').textContent);
+    var button = document.getElementById('score-btn');
+    var out = document.getElementById('score-out');
+    button.addEventListener('click', function () {
+      out.className = 'score-out muted';
+      out.textContent = 'Scoring…';
+      fetch('/admin/api/score/' + id, { method: 'POST' })
+        .then(function (response) { return response.json().then(function (body) { return { ok: response.ok, body: body }; }); })
+        .then(function (result) {
+          if (!result.ok) { out.className = 'score-out error'; out.textContent = result.body.error || 'Scoring failed.'; return; }
+          var d = result.body;
+          out.className = 'score-out';
+          out.innerHTML = '<div class="lane ' + UplixAdmin.laneClass(d.lane) + '">' + d.lane + '</div>' +
+            '<table class="mini"><tr><td>Uplift</td><td>' + (100 * d.uplift).toFixed(2) + ' pp</td></tr>' +
+            '<tr><td>P(order), no coupon</td><td>' + (100 * d.mu0).toFixed(1) + '%</td></tr>' +
+            '<tr><td>P(order), coupon</td><td>' + (100 * d.mu1).toFixed(1) + '%</td></tr>' +
+            '<tr><td>Gain per customer</td><td>' + Math.round(d.gain) + '</td></tr></table>' +
+            '<p class="muted small">SIMULATED: model trained on synthetic data.</p>';
+        })
+        .catch(function () { out.className = 'score-out error'; out.textContent = 'Could not reach the console endpoint.'; });
+    });
+  })();
+</script>
+{% endblock %}

@@ -1,0 +1,129 @@
+{% extends "admin/base.html" %}
+{% block title %}Model{% endblock %}
+{% block body %}
+<h1>Model <span class="badge sim">SIMULATED</span></h1>
+
+{% if not graphs %}
+<section class="card">
+  <h2>No model results available</h2>
+  <p class="muted">Neither the live ML service nor the bundled sample
+    <code>sample_data/model_run_synthetic.json</code> could be read. Set <code>ML_API_URL</code> and
+    <code>ML_API_KEY</code> in this deployment, or keep the sample file next to <code>app.py</code>.</p>
+</section>
+{% else %}
+<div class="flash notice">
+  The model was trained on <b>synthetic data</b> with a known truth. Every chart and number on this
+  page is simulated, and the scoring button on a customer page is labelled the same way. Nothing
+  here is a claim about real customers.
+  <span class="muted">Source: {{ 'live ML service' if origin == 'live' else 'bundled sample run' }}.</span>
+</div>
+
+<div class="cards">
+  <div class="card kpi"><span class="label">Model</span><span class="value small-value">{{ graphs.model }}</span></div>
+  <div class="card kpi"><span class="label">Customers train / test</span><span class="value">{{ graphs.n }} / {{ graphs.n_test }}</span></div>
+  <div class="card kpi"><span class="label">Average order value</span><span class="value">{{ money(graphs.order_value) }}</span></div>
+  <div class="card kpi"><span class="label">Truth correlation</span><span class="value">{{ '%.2f' % graphs.truth_corr }}</span></div>
+</div>
+
+<section class="card">
+  <h2>Value per 1,000 customers, by strategy</h2>
+  <div class="filters">
+    <label>Coupon value
+      <select id="coupon-select">
+        {% for amount in coupons %}
+        <option value="{{ amount }}">{{ amount }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <span class="muted small">Bars are point estimates; whiskers are the interval from resampling.</span>
+  </div>
+  <div id="strategy-chart" class="chart"></div>
+  <div class="verdict-line" id="strategy-verdict"></div>
+  <h3>Differences against the alternatives</h3>
+  <div id="difference-chart" class="chart short"></div>
+</section>
+
+<div class="grid two">
+  <section class="card">
+    <h2>Budget curve</h2>
+    <p class="muted small">Value as the treated share rises from 0% to 100%, for the same coupon.</p>
+    <div id="budget-chart" class="chart"></div>
+    <div class="budget-row">
+      <label for="budget-slider">Treated share <b id="budget-value">25%</b></label>
+      <input id="budget-slider" type="range" min="0" max="100" step="5" value="25">
+      <div class="muted small" id="budget-readout"></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Qini curve</h2>
+    <p class="muted small">Cumulative gain as customers are targeted from most to least persuadable.
+      An uplift model should stay above the traditional ranking.</p>
+    <div id="qini-chart" class="chart"></div>
+    <div class="legend">
+      <span class="key uplift"></span> Uplift model
+      <span class="key traditional"></span> Traditional (likeliest buyers)
+    </div>
+  </section>
+</div>
+
+<section class="card">
+  <h2>Uplift by score quintile</h2>
+  <p class="muted small">Customers are ordered by predicted uplift, then cut into five equal groups.
+    A useful model has a clear decline from group 1 to group 5.</p>
+  <table class="table compact">
+    <thead><tr><th>Group</th><th class="num">n</th><th class="num">Coupon rate</th>
+               <th class="num">No-coupon rate</th><th class="num">Uplift</th><th>Interval</th></tr></thead>
+    <tbody>
+      {% for row in graphs.quintiles %}
+      <tr><td>{{ row.group }}</td><td class="num">{{ row.n }}</td>
+          <td class="num">{{ percent(row.rate_coupon) }}</td>
+          <td class="num">{{ percent(row.rate_no_coupon) }}</td>
+          <td class="num"><b>{{ '%+.1f'|format(100 * row.uplift) }} pp</b></td>
+          <td class="muted">{{ '%+.1f'|format(100 * row.lo) }} to {{ '%+.1f'|format(100 * row.hi) }} pp</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section class="card">
+  <h2>Honesty check</h2>
+  <p class="muted small">The same pipeline was run on fresh synthetic worlds, ten times each.</p>
+  <table class="table compact">
+    <thead><tr><th>World</th><th class="num">Runs</th><th class="num">Verdict reliable</th>
+               <th class="num">Uplift beat traditional</th></tr></thead>
+    <tbody>
+      {% for name, row in graphs.robustness.items() %}
+      <tr><td>{{ name }}</td><td class="num">{{ row.runs }}</td>
+          <td class="num">{{ row.reliable }}</td><td class="num">{{ row.uplift_beats_traditional }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="muted small">"Coupon does nothing" should never look reliable. "Coupon effect differs by
+    person" should usually look reliable and favour the uplift model.</p>
+</section>
+
+<div class="muted small">Run generated {{ graphs.generated_at }}.</div>
+<script type="application/json" id="model-data">{{ graphs|tojson }}</script>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+{% if graphs %}
+<script>
+  (function () {
+    var graphs = JSON.parse(document.getElementById('model-data').textContent);
+    UplixAdmin.modelPage(graphs, {
+      select: document.getElementById('coupon-select'),
+      strategy: document.getElementById('strategy-chart'),
+      differences: document.getElementById('difference-chart'),
+      verdict: document.getElementById('strategy-verdict'),
+      budget: document.getElementById('budget-chart'),
+      slider: document.getElementById('budget-slider'),
+      budgetValue: document.getElementById('budget-value'),
+      budgetReadout: document.getElementById('budget-readout'),
+      qini: document.getElementById('qini-chart')
+    });
+  })();
+</script>
+{% endif %}
+{% endblock %}

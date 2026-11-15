@@ -1,0 +1,89 @@
+{% extends "admin/base.html" %}
+{% block title %}Overview{% endblock %}
+{% block body %}
+<h1>Overview <span class="muted mono">{{ source }}</span></h1>
+
+<div class="cards">
+  <div class="card kpi"><span class="label">Customers</span><span class="value">{{ counts.customers }}</span></div>
+  <div class="card kpi"><span class="label">Orders</span><span class="value">{{ counts.orders }}</span></div>
+  <div class="card kpi"><span class="label">Events</span><span class="value">{{ counts.events }}</span></div>
+  <div class="card kpi"><span class="label">State</span><span class="value small-value">{{ state.state }}</span></div>
+</div>
+
+<div class="grid two">
+  <section class="card">
+    <h2>Funnel per round</h2>
+    <div id="funnel-chart" class="chart"></div>
+    <p class="muted small">Distinct customers reaching each step: view, cart, checkout, order.</p>
+  </section>
+  <section class="card">
+    <h2>Orders over time</h2>
+    <div id="time-chart" class="chart"></div>
+    <p class="muted small">Rounds are shaded; bars are 5-minute buckets.</p>
+  </section>
+</div>
+
+<div class="grid two">
+  <section class="card">
+    <h2>Customer types</h2>
+    <div id="tag-chart" class="chart doughnut-chart"></div>
+    <p class="muted small">Round 1 behaviour only. Click a slice to filter the Customers page.</p>
+  </section>
+  <section class="card">
+    <h2>Coupon effect</h2>
+    {% if effect %}
+      <div class="effect-line">
+        <span class="badge {{ effect.verdict }}">{{ effect.verdict }}</span>
+        <span>{{ effect.n }} customers &middot; {{ effect.n_treated }} coupon / {{ effect.n_control }} control</span>
+      </div>
+      <table class="mini">
+        <tr><td>Order rate, coupon</td><td>{{ percent(effect.rate_treated) }}</td></tr>
+        <tr><td>Order rate, control</td><td>{{ percent(effect.rate_control) }}</td></tr>
+        <tr><td>Effect</td><td>{{ '%+.1f' % (100 * effect.effect) }} pp</td></tr>
+        <tr><td>Exact p</td><td>{{ '%.4f' % effect.p_value }}</td></tr>
+        <tr><td>Interval</td><td>{% if effect.lo is none %}&mdash;{% else %}{{ '%+.2f'|format(effect.lo * 100) }} to {{ '%+.2f'|format(effect.hi * 100) }} pp{% endif %}</td></tr>
+        {% if effect.revenue %}
+        <tr><td>Revenue per customer</td><td>{{ money(effect.revenue.treated) }} vs {{ money(effect.revenue.control) }}</td></tr>
+        {% endif %}
+      </table>
+      {% if effect.reasons %}
+        <ul class="reasons">{% for reason in effect.reasons %}<li>{{ reason }}</li>{% endfor %}</ul>
+      {% endif %}
+    {% else %}
+      <p class="muted">No split yet for this source. Press <b>Randomize</b> on the Experiment page.</p>
+    {% endif %}
+  </section>
+</div>
+
+<section class="card">
+  <h2>Power calculator</h2>
+  <p class="muted small">Customers needed per group, two-sided 5%, 80% power. The fixed table underneath is the brief's.</p>
+  <div class="power-row">
+    <label>Baseline % <input id="power-p1" type="number" min="1" max="99" value="20" step="1"></label>
+    <label>Target % <input id="power-p2" type="number" min="1" max="99" value="30" step="1"></label>
+    <span class="power-out">per group: <b id="power-n">291</b></span>
+  </div>
+  <table class="table compact">
+    <thead><tr><th>Baseline</th><th>Target</th><th>Per group</th></tr></thead>
+    <tbody>
+      {% for p1, p2, n in power_rows %}
+      <tr><td>{{ (100 * p1)|round|int }}%</td><td>{{ (100 * p2)|round|int }}%</td><td>{{ n }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<script type="application/json" id="overview-data">{{ chart|tojson }}</script>
+{% endblock %}
+{% block scripts %}
+<script>
+  (function () {
+    var data = JSON.parse(document.getElementById('overview-data').textContent);
+    UplixAdmin.funnel(document.getElementById('funnel-chart'), data.funnel);
+    UplixAdmin.timeline(document.getElementById('time-chart'), data.buckets, data.bounds);
+    UplixAdmin.doughnut(document.getElementById('tag-chart'), data.by_tag);
+    UplixAdmin.power(document.getElementById('power-p1'), document.getElementById('power-p2'),
+                     document.getElementById('power-n'));
+  })();
+</script>
+{% endblock %}
