@@ -1,0 +1,5 @@
+# Project-level ignore for Vercel project 2 (Root Directory = ml_service).
+# Its presence matters: without it Vercel falls back to the repo-root .venusignore,
+# which lists "ml_service" (to keep the Flask project's bundle small) and would
+# otherwise be applied to this project too. Project-level always takes precedence.
+__pycache__
