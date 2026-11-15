@@ -94,7 +94,13 @@ def test_predict_rejects_bad_input(client):
 
 def test_batch_matches_single(client):
     batch = client.post("/predict/batch", json=[GOOD, {**GOOD, "n_views_r1": 0, "n_cart_adds_r1": 0, "n_orders_r1": 0, "r1_spend": 0}]).json()
-    assert batch[0] == client.post("/predict", json=GOOD).json() and len(batch) == 2
+    single = client.post("/predict", json=GOOD).json()
+    assert len(batch) == 2
+    # numpy's matmul can differ by ~1 ulp between a (1, 9) and a (2, 9) input, so exact == on
+    # floats is wrong here; compare with tolerances instead (this file uses them elsewhere too).
+    assert batch[0]["lane"] == single["lane"]
+    nums = [k for k in single if k != "lane"]
+    assert all(batch[0][k] == pytest.approx(single[k], rel=1e-9, abs=1e-12) for k in nums)
 
 
 def test_api_key_is_enforced_when_set(client, monkeypatch):
